@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPLINT — raise AI creatures in a living pixel world</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; color: #c8d0e0; font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; }
+
+  #gameCanvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; cursor: crosshair; }
+
+  /* UI Overlay */
+  .ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+  .ui-layer > * { pointer-events: auto; }
+
+  /* Top Bar */
+  .top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; background: #0a0a12dd; border-bottom: 1px solid #1a1a2e;
+  }
+  .logo { font-family: 'Press Start 2P', monospace; font-size: 14px; color: #50fa7b; text-shadow: 0 0 10px #50fa7b60; }
+  .logo span { color: #ff79c6; }
+  .top-stats { display: flex; gap: 20px; font-size: 11px; font-family: 'Press Start 2P', monospace; }
+  .top-stat .label { color: #555; font-size: 8px; }
+  .top-stat .val { color: #bd93f9; }
+
+  /* Selected Creature Panel */
+  .creature-panel {
+    position: absolute; bottom: 20px; left: 20px; width: 320px;
+    background: #12121cee; border: 1px solid #2a2a4a; border-radius: 8px;
+    padding: 16px; display: none; backdrop-filter: blur(8px);
+  }
+  .creature-panel.active { display: block; }
+  .creature-panel .name { font-family: 'Press Start 2P', monospace; font-size: 12px; color: #f8f8f2; margin-bottom: 8px; }
+  .creature-panel .species { font-size: 10px; color: #6272a4; margin-bottom: 12px; font-family: 'Press Start 2P', monospace; }
+  .stat-bars { display: flex; flex-direction: column; gap: 6px; }
+  .stat-row { display: flex; align-items: center; gap: 8px; }
+  .stat-label { font-size: 9px; color: #6272a4; min-width: 70px; font-family: 'Press Start 2P', monospace; }
+  .stat-bar { flex: 1; height: 8px; background: #1a1a2e; border-radius: 4px; overflow: hidden; }
+  .stat-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+  .stat-val { font-size: 9px; color: #999; min-width: 24px; text-align: right; font-family: 'Press Start 2P', monospace; }
+
+  .creature-panel .activity { margin-top: 10px; font-size: 10px; color: #8be9fd; font-style: italic; }
+  .creature-panel .xp-bar { margin-top: 8px; }
+  .creature-panel .xp-label { font-size: 8px; color: #6272a4; font-family: 'Press Start 2P', monospace; }
+  .creature-panel .xp-track { height: 6px; background: #1a1a2e; border-radius: 3px; margin-top: 3px; overflow: hidden; }
+  .creature-panel .xp-fill { height: 100%; background: linear-gradient(90deg, #50fa7b, #8be9fd); border-radius: 3px; }
+
+  /* World Info */
+  .world-info {
+    position: absolute; top: 60px; right: 20px; width: 220px;
+    background: #12121cee; border: 1px solid #2a2a4a; border-radius: 8px;
+    padding: 12px; backdrop-filter: blur(8px); font-size: 10px;
+  }
+  .world-info h3 { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ff79c6; margin-bottom: 8px; }
+  .zone-list { list-style: none; }
+  .zone-list li { padding: 3px 0; color: #aaa; display: flex; justify-content: space-between; }
+  .zone-list .zone-name { color: #f8f8f2; }
+  .zone-list .zone-pop { color: #bd93f9; font-family: 'Press Start 2P', monospace; font-size: 8px; }
+
+  /* Event Log */
+  .event-log {
+    position: absolute; bottom: 20px; right: 20px; width: 300px; max-height: 200px;
+    background: #12121cee; border: 1px solid #2a2a4a; border-radius: 8px;
+    padding: 12px; backdrop-filter: blur(8px); overflow: hidden;
+  }
+  .event-log h3 { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #ffb86c; margin-bottom: 8px; }
+  .event-list { list-style: none; max-height: 160px; overflow: hidden; }
+  .event-list li { font-size: 10px; padding: 2px 0; color: #888; border-bottom: 1px solid #1a1a2e10; }
+  .event-list .ev-time { color: #444; font-size: 9px; margin-right: 6px; }
+  .event-list .ev-good { color: #50fa7b; }
+  .event-list .ev-bad { color: #ff5555; }
+  .event-list .ev-neutral { color: #8be9fd; }
+
+  /* SPLINT Button */
+  .SPLINT-btn {
+    position: absolute; top: 60px; left: 20px;
+    font-family: 'Press Start 2P', monospace; font-size: 10px;
+    background: #50fa7b20; border: 1px solid #50fa7b; color: #50fa7b;
+    padding: 10px 16px; border-radius: 6px; cursor: pointer;
+    transition: all 0.2s; text-shadow: 0 0 8px #50fa7b60;
+  }
+  .SPLINT-btn:hover { background: #50fa7b40; transform: scale(1.05); }
+
+  /* Minimap */
+  .minimap {
+    position: absolute; bottom: 20px; left: 360px; width: 120px; height: 120px;
+    background: #12121cee; border: 1px solid #2a2a4a; border-radius: 6px;
+    overflow: hidden;
+  }
+  .minimap canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div class="ui-layer">
+  <div class="top-bar">
+    <div class="logo">SPLINT<span>ERY</span></div>
+    <div class="top-stats">
+      <div class="top-stat"><div class="label">CREATURES</div><div class="val" id="creatureCount">0</div></div>
+      <div class="top-stat"><div class="label">TASKS</div><div class="val" id="taskCount">0</div></div>
+      <div class="top-stat"><div class="label">CYCLE</div><div class="val" id="cycleCount">0</div></div>
+    </div>
+  </div>
+
+  <button class="SPLINT-btn" id="hatchBtn">🥚 HATCH EGG</button>
+
+  <div class="world-info">
+    <h3>BIOMES</h3>
+    <ul class="zone-list" id="zoneList"></ul>
+  </div>
+
+  <div class="creature-panel" id="creaturePanel">
+    <div class="name" id="cName"></div>
+    <div class="species" id="cSpecies"></div>
+    <div class="stat-bars" id="cStats"></div>
+    <div class="xp-bar">
+      <div class="xp-label">XP <span id="cXp"></span></div>
+      <div class="xp-track"><div class="xp-fill" id="cXpFill"></div></div>
+    </div>
+    <div class="activity" id="cActivity"></div>
+  </div>
+
+  <div class="event-log">
+    <h3>WORLD LOG</h3>
+    <ul class="event-list" id="eventList"></ul>
+  </div>
+
+  <div class="minimap"><canvas id="minimapCanvas"></canvas></div>
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const TILE = 16;
+const WORLD_W = 128;
+const WORLD_H = 128;
+const PIXEL_W = WORLD_W * TILE;
+const PIXEL_H = WORLD_H * TILE;
+
+// Biomes
+const BIOMES = [
+  { name: 'Meadow',    color: '#2d5a27', ground: '#1a3a15', accent: '#50fa7b', taskType: 'gather',  x: 0,  y: 0,  w: 40, h: 40 },
+  { name: 'Forge',     color: '#4a2020', ground: '#2a1010', accent: '#ff5555', taskType: 'code',    x: 40, y: 0,  w: 44, h: 40 },
+  { name: 'Library',   color: '#1a2a4a', ground: '#0f1a30', accent: '#8be9fd', taskType: 'research',x: 84, y: 0,  w: 44, h: 40 },
+  { name: 'Garden',    color: '#2a4a2a', ground: '#1a3020', accent: '#f1fa8c', taskType: 'create',  x: 0,  y: 40, w: 40, h: 44 },
+  { name: 'Arena',     color: '#4a3020', ground: '#2a1a10', accent: '#ffb86c', taskType: 'fight',   x: 40, y: 40, w: 44, h: 44 },
+  { name: 'Depths',    color: '#1a1a30', ground: '#0a0a1a', accent: '#bd93f9', taskType: 'explore', x: 84, y: 40, w: 44, h: 44 },
+  { name: 'Nest',      color: '#2a2020', ground: '#1a1515', accent: '#ff79c6', taskType: 'rest',    x: 0,  y: 84, w: 40, h: 44 },
+  { name: 'Bazaar',    color: '#3a3a1a', ground: '#2a2a10', accent: '#f8f8f2', taskType: 'trade',   x: 40, y: 84, w: 44, h: 44 },
+  { name: 'Void',      color: '#0f0f1a', ground: '#050510', accent: '#6272a4', taskType: 'mystery', x: 84, y: 84, w: 44, h: 44 },
+];
+
+// Creature species
+const SPECIES = [
+  { name: 'Glimmer',  base: '#50fa7b', shape: 'round',  size: 1.0 },
+  { name: 'Ember',    base: '#ff5555', shape: 'spiky',  size: 0.9 },
+  { name: 'Whisp',    base: '#8be9fd', shape: 'floaty', size: 0.8 },
+  { name: 'Thunk',    base: '#ffb86c', shape: 'blocky', size: 1.3 },
+  { name: 'Shade',    base: '#bd93f9', shape: 'wispy',  size: 0.7 },
+  { name: 'Bloom',    base: '#ff79c6', shape: 'round',  size: 1.1 },
+  { name: 'Crux',     base: '#f1fa8c', shape: 'angular',size: 1.0 },
+];
+
+const NAMES_PRE = ['Zyx','Nub','Kip','Boo','Rix','Vim','Dot','Pip','Hex','Lux','Fog','Dex','Pix','Jot','Zap','Orb'];
+const NAMES_SUF = ['ling','bit','mite','spark','wisp','blob','core','dust','fang','eye','fin','horn','tail','wing'];
+
+// ===== STATE =====
+const state = {
+  creatures: [],
+  tasks: [],
+  particles: [],
+  eggs: [],
+  events: [],
+  camera: { x: PIXEL_W/2 - 400, y: PIXEL_H/2 - 300 },
+  selected: null,
+  cycle: 0,
+  worldTiles: null,
+  dragging: false,
+  dragStart: { x: 0, y: 0 },
+  camStart: { x: 0, y: 0 },
+};
+
+// ===== WORLD GENERATION =====
+function generateWorld() {
+  state.worldTiles = new Array(WORLD_W * WORLD_H);
+  for (let y = 0; y < WORLD_H; y++) {
+    for (let x = 0; x < WORLD_W; x++) {
+      const biome = getBiome(x, y);
+      const noise = Math.random();
+      let type = 'ground';
+      if (noise > 0.95) type = 'feature';
+      else if (noise > 0.88) type = 'deco';
+      state.worldTiles[y * WORLD_W + x] = { biome: biome, type };
+    }
+  }
+}
+
+function getBiome(tx, ty) {
+  for (const b of BIOMES) {
+    if (tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h) return b;
+  }
+  return BIOMES[8]; // Void
+}
+
+// ===== CREATURES =====
+function randomName() {
+  return NAMES_PRE[Math.floor(Math.random()*NAMES_PRE.length)] + NAMES_SUF[Math.floor(Math.random()*NAMES_SUF.length)];
+}
+
+function createCreature(x, y) {
+  const species = SPECIES[Math.floor(Math.random() * SPECIES.length)];
+  const creature = {
+    id: Date.now() + Math.random(),
+    name: randomName(),
+    species: species,
+    x, y,
+    targetX: x, targetY: y,
+    stats: {
+      intelligence: 5 + Math.floor(Math.random() * 15),
+      creativity: 5 + Math.floor(Math.random() * 15),
+      strength: 5 + Math.floor(Math.random() * 15),
+      speed: 5 + Math.floor(Math.random() * 15),
+      luck: 5 + Math.floor(Math.random() * 15),
+    },
+    xp: 0,
+    level: 1,
+    hp: 100,
+    maxHp: 100,
+    state: 'idle',
+    activity: 'just SPLINTed!',
+    stateTimer: 0,
+    mutations: [],
+    age: 0,
+    bodyParts: {
+      hasHorns: false,
+      hasWings: false,
+      hasTail: Math.random() > 0.5,
+      eyeCount: 1 + Math.floor(Math.random() * 2),
+      bodyScale: species.size,
+    },
+    color: species.base,
+    animFrame: 0,
+    animTimer: 0,
+    bobOffset: Math.random() * Math.PI * 2,
+  };
+  state.creatures.push(creature);
+  addEvent(`${creature.name} the ${species.name} SPLINTed!`, 'good');
+  return creature;
+}
+
+// ===== TASKS =====
+function spawnTask() {
+  const biome = BIOMES[Math.floor(Math.random() * BIOMES.length)];
+  const tx = biome.x + 2 + Math.floor(Math.random() * (biome.w - 4));
+  const ty = biome.y + 2 + Math.floor(Math.random() * (biome.h - 4));
+  const difficulty = 1 + Math.floor(Math.random() * 5);
+
+  const task = {
+    id: Date.now() + Math.random(),
+    x: tx * TILE + TILE/2,
+    y: ty * TILE + TILE/2,
+    biome,
+    type: biome.taskType,
+    difficulty,
+    xpReward: difficulty * 10 + Math.floor(Math.random() * 20),
+    pulse: 0,
+    claimed: false,
+  };
+  state.tasks.push(task);
+}
+
+// ===== AI BEHAVIOR =====
+function updateCreature(c, dt) {
+  c.age += dt;
+  c.animTimer += dt;
+  c.bobOffset += dt * 2;
+  if (c.animTimer > 0.3) { c.animTimer = 0; c.animFrame = (c.animFrame + 1) % 4; }
+
+  c.stateTimer -= dt;
+
+  // Lerp movement
+  const dx = c.targetX - c.x;
+  const dy = c.targetY - c.y;
+  const spd = (c.stats.speed / 10) * 60 * dt;
+  if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    c.x += (dx/dist) * Math.min(spd, dist);
+    c.y += (dy/dist) * Math.min(spd, dist);
+  }
+
+  if (c.stateTimer <= 0) {
+    switch(c.state) {
+      case 'idle':
+        // Look for nearby task
+        const nearTask = findNearestTask(c);
+        if (nearTask && !nearTask.claimed) {
+          nearTask.claimed = true;
+          c.state = 'moving_to_task';
+          c.currentTask = nearTask;
+          c.targetX = nearTask.x;
+          c.targetY = nearTask.y;
+          c.activity = `heading to ${nearTask.type} task`;
+          c.stateTimer = 30;
+        } else {
+          // Wander
+          c.state = 'wander';
+          const biome = BIOMES[Math.floor(Math.random() * BIOMES.length)];
+          c.targetX = (biome.x + 2 + Math.random() * (biome.w - 4)) * TILE;
+          c.targetY = (biome.y + 2 + Math.random() * (biome.h - 4)) * TILE;
+          c.activity = `wandering toward ${biome.name}`;
+          c.stateTimer = 5 + Math.random() * 10;
+        }
+        break;
+
+      case 'wander':
+        c.state = 'idle';
+        c.stateTimer = 1 + Math.random() * 3;
+        c.activity = 'looking around...';
+        break;
+
+      case 'moving_to_task':
+        if (!c.currentTask) { c.state = 'idle'; break; }
+        const tdx = c.currentTask.x - c.x;
+        const tdy = c.currentTask.y - c.y;
+        if (Math.sqrt(tdx*tdx + tdy*tdy) < TILE) {
+          c.state = 'working';
+          c.stateTimer = 2 + c.currentTask.difficulty;
+          c.activity = `working on ${c.currentTask.type}...`;
+        } else {
+          c.stateTimer = 0.5;
+        }
+        break;
+
+      case 'working':
+        if (c.currentTask) {
+          const relevantStat = getRelevantStat(c, c.currentTask.type);
+          const success = Math.random() * 20 < relevantStat + c.stats.luck / 5;
+
+          if (success) {
+            c.xp += c.currentTask.xpReward;
+            const statKey = getStatKey(c.currentTask.type);
+            if (statKey) c.stats[statKey] = Math.min(99, c.stats[statKey] + 1);
+            addEvent(`${c.name} completed ${c.currentTask.type}! +${c.currentTask.xpReward}xp`, 'good');
+            c.activity = `nailed it! +${c.currentTask.xpReward}xp`;
+
+            // Particles
+            for (let i = 0; i < 8; i++) {
+              state.particles.push({
+                x: c.x, y: c.y - 8,
+                vx: (Math.random()-0.5)*60, vy: -Math.random()*40-20,
+                life: 1, color: '#50fa7b', size: 2+Math.random()*2,
+              });
+            }
+          } else {
+            c.stats.luck = Math.max(1, c.stats.luck - 1);
+            addEvent(`${c.name} failed at ${c.currentTask.type}`, 'bad');
+            c.activity = 'failed... learning from it';
+
+            for (let i = 0; i < 4; i++) {
+              state.particles.push({
+                x: c.x, y: c.y - 8,
+                vx: (Math.random()-0.5)*30, vy: -Math.random()*20-10,
+                life: 0.8, color: '#ff5555', size: 2,
+              });
+            }
+          }
+
+          // Remove task
+          state.tasks = state.tasks.filter(t => t.id !== c.currentTask.id);
+          c.currentTask = null;
+
+          // Check level up
+          checkLevelUp(c);
+        }
+        c.state = 'idle';
+        c.stateTimer = 2 + Math.random() * 3;
+        break;
+    }
+  }
+}
+
+function findNearestTask(c) {
+  let nearest = null, minDist = Infinity;
+  for (const t of state.tasks) {
+    if (t.claimed) continue;
+    const d = Math.sqrt((t.x-c.x)**2 + (t.y-c.y)**2);
+    if (d < minDist) { minDist = d; nearest = t; }
+  }
+  return nearest;
+}
+
+function getRelevantStat(c, taskType) {
+  const map = { code: 'intelligence', research: 'intelligence', create: 'creativity', gather: 'strength', fight: 'strength', explore: 'speed', trade: 'luck', rest: 'luck', mystery: 'creativity' };
+  return c.stats[map[taskType] || 'intelligence'];
+}
+
+function getStatKey(taskType) {
+  const map = { code: 'intelligence', research: 'intelligence', create: 'creativity', gather: 'strength', fight: 'strength', explore: 'speed', trade: 'luck', mystery: 'creativity' };
+  return map[taskType];
+}
+
+function checkLevelUp(c) {
+  const needed = c.level * 50;
+  if (c.xp >= needed) {
+    c.xp -= needed;
+    c.level++;
+    c.maxHp += 10;
+    c.hp = c.maxHp;
+
+    // Mutations at certain levels
+    if (c.level === 3 && Math.random() > 0.5) { c.bodyParts.hasHorns = true; c.mutations.push('horns'); addEvent(`${c.name} grew horns!`, 'neutral'); }
+    if (c.level === 5 && Math.random() > 0.5) { c.bodyParts.hasWings = true; c.mutations.push('wings'); c.stats.speed += 5; addEvent(`${c.name} grew wings!`, 'neutral'); }
+    if (c.level >= 4) c.bodyParts.bodyScale = Math.min(2, c.bodyParts.bodyScale + 0.1);
+
+    addEvent(`${c.name} reached level ${c.level}!`, 'good');
+    c.activity = `LEVEL UP! now level ${c.level}`;
+  }
+}
+
+// ===== EVENTS =====
+function addEvent(text, type) {
+  state.events.unshift({ text, type, time: Date.now() });
+  if (state.events.length > 30) state.events.pop();
+  renderEventLog();
+}
+
+// ===== RENDERING =====
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function drawWorld() {
+  const cam = state.camera;
+  const startTX = Math.max(0, Math.floor(cam.x / TILE));
+  const startTY = Math.max(0, Math.floor(cam.y / TILE));
+  const endTX = Math.min(WORLD_W, Math.ceil((cam.x + canvas.width) / TILE) + 1);
+  const endTY = Math.min(WORLD_H, Math.ceil((cam.y + canvas.height) / TILE) + 1);
+
+  for (let ty = startTY; ty < endTY; ty++) {
+    for (let tx = startTX; tx < endTX; tx++) {
+      const tile = state.worldTiles[ty * WORLD_W + tx];
+      if (!tile) continue;
+      const sx = tx * TILE - cam.x;
+      const sy = ty * TILE - cam.y;
+
+      ctx.fillStyle = tile.biome.ground;
+      ctx.fillRect(sx, sy, TILE, TILE);
+
+      if (tile.type === 'deco') {
+        ctx.fillStyle = tile.biome.color;
+        ctx.fillRect(sx+4, sy+4, 8, 8);
+      } else if (tile.type === 'feature') {
+        ctx.fillStyle = tile.biome.accent + '40';
+        ctx.fillRect(sx+2, sy+2, 12, 12);
+        ctx.fillStyle = tile.biome.accent + '80';
+        ctx.fillRect(sx+4, sy+4, 8, 8);
+      }
+
+      // Biome borders
+      if (tx === tile.biome.x || ty === tile.biome.y) {
+        ctx.fillStyle = tile.biome.accent + '15';
+        ctx.fillRect(sx, sy, TILE, TILE);
+      }
+    }
+  }
+}
+
+function drawCreature(c) {
+  const cam = state.camera;
+  const sx = c.x - cam.x;
+  const sy = c.y - cam.y;
+  const bob = Math.sin(c.bobOffset) * 2;
+  const scale = c.bodyParts.bodyScale;
+  const s = 6 * scale;
+
+  // Shadow
+  ctx.fillStyle = '#00000040';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + s + 2, s * 0.8, 3, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Body
+  const bodyY = sy + bob;
+  ctx.fillStyle = c.color;
+
+  if (c.species.shape === 'round') {
+    ctx.beginPath();
+    ctx.arc(sx, bodyY, s, 0, Math.PI*2);
+    ctx.fill();
+  } else if (c.species.shape === 'blocky') {
+    ctx.fillRect(sx-s, bodyY-s, s*2, s*2);
+  } else if (c.species.shape === 'spiky') {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (i/5)*Math.PI*2 - Math.PI/2;
+      const r = i%2===0 ? s : s*0.5;
+      ctx.lineTo(sx + Math.cos(a)*r, bodyY + Math.sin(a)*r);
+    }
+    ctx.closePath(); ctx.fill();
+  } else if (c.species.shape === 'floaty') {
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(sx, bodyY, s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(sx, bodyY, s*1.4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else if (c.species.shape === 'wispy') {
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(sx, bodyY, s, 0, Math.PI*2);
+    ctx.fill();
+    // Wispy trail
+    for (let i = 1; i <= 3; i++) {
+      ctx.globalAlpha = 0.3 - i*0.08;
+      ctx.beginPath();
+      ctx.arc(sx - i*3, bodyY + i*2, s*0.6, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (c.species.shape === 'angular') {
+    ctx.beginPath();
+    ctx.moveTo(sx, bodyY - s);
+    ctx.lineTo(sx + s, bodyY + s*0.5);
+    ctx.lineTo(sx - s, bodyY + s*0.5);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // Eyes
+  const eyeY = bodyY - s*0.2;
+  for (let i = 0; i < c.bodyParts.eyeCount; i++) {
+    const offset = c.bodyParts.eyeCount === 1 ? 0 : (i - 0.5) * s * 0.6;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sx + offset, eyeY, 2.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(sx + offset + 0.5, eyeY, 1.2, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Horns
+  if (c.bodyParts.hasHorns) {
+    ctx.fillStyle = '#f8f8f2';
+    ctx.beginPath();
+    ctx.moveTo(sx-s*0.5, bodyY-s);
+    ctx.lineTo(sx-s*0.3, bodyY-s*1.8);
+    ctx.lineTo(sx-s*0.1, bodyY-s);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx+s*0.5, bodyY-s);
+    ctx.lineTo(sx+s*0.3, bodyY-s*1.8);
+    ctx.lineTo(sx+s*0.1, bodyY-s);
+    ctx.fill();
+  }
+
+  // Wings
+  if (c.bodyParts.hasWings) {
+    const wingFlap = Math.sin(c.bobOffset * 3) * 0.3;
+    ctx.fillStyle = c.color + '60';
+    ctx.beginPath();
+    ctx.ellipse(sx - s*1.2, bodyY - s*0.3, s*0.8, s*0.4, wingFlap, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(sx + s*1.2, bodyY - s*0.3, s*0.8, s*0.4, -wingFlap, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Tail
+  if (c.bodyParts.hasTail) {
+    const tailWag = Math.sin(c.bobOffset * 2) * 4;
+    ctx.strokeStyle = c.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, bodyY + s*0.5);
+    ctx.quadraticCurveTo(sx + tailWag + s, bodyY + s, sx + tailWag + s*0.5, bodyY + s*1.5);
+    ctx.stroke();
+  }
+
+  // Name tag
+  if (state.selected === c) {
+    ctx.fillStyle = '#f8f8f2';
+    ctx.font = '8px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.name, sx, bodyY - s*1.5 - 8);
+    // Selection ring
+    ctx.strokeStyle = '#50fa7b';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.arc(sx, bodyY, s + 5, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Level indicator
+  ctx.fillStyle = '#bd93f9';
+  ctx.font = '6px "Press Start 2P"';
+  ctx.textAlign = 'center';
+  ctx.fillText(`L${c.level}`, sx, sy + s + 12);
+}
+
+function drawTasks() {
+  const cam = state.camera;
+  const t = Date.now() / 1000;
+
+  for (const task of state.tasks) {
+    const sx = task.x - cam.x;
+    const sy = task.y - cam.y;
+    if (sx < -20 || sx > canvas.width+20 || sy < -20 || sy > canvas.height+20) continue;
+
+    const pulse = Math.sin(t * 3 + task.id) * 0.3 + 0.7;
+    const r = 4 + task.difficulty;
+
+    // Glow
+    ctx.fillStyle = task.biome.accent + '30';
+    ctx.beginPath();
+    ctx.arc(sx, sy, r * 2 * pulse, 0, Math.PI*2);
+    ctx.fill();
+
+    // Core
+    ctx.fillStyle = task.biome.accent;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r * pulse, 0, Math.PI*2);
+    ctx.fill();
+
+    // Inner
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawParticles(dt) {
+  state.particles = state.particles.filter(p => {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 80 * dt;
+    p.life -= dt * 1.5;
+    if (p.life <= 0) return false;
+
+    const cam = state.camera;
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - cam.x, p.y - cam.y, p.size, p.size);
+    ctx.globalAlpha = 1;
+    return true;
+  });
+}
+
+function drawEggs() {
+  const cam = state.camera;
+  const t = Date.now() / 1000;
+
+  state.eggs = state.eggs.filter(egg => {
+    egg.timer -= 1/60;
+    const sx = egg.x - cam.x;
+    const sy = egg.y - cam.y;
+    const wobble = Math.sin(t * 8) * 2;
+    const progress = 1 - (egg.timer / egg.duration);
+
+    // Egg shape
+    ctx.fillStyle = `hsl(${120 + progress * 200}, 60%, ${40 + progress * 20}%)`;
+    ctx.beginPath();
+    ctx.ellipse(sx + wobble, sy, 6, 8, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Cracks
+    if (progress > 0.5) {
+      ctx.strokeStyle = '#f8f8f2';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx-2, sy-4);
+      ctx.lineTo(sx+1, sy);
+      ctx.lineTo(sx-1, sy+3);
+      ctx.stroke();
+    }
+
+    if (egg.timer <= 0) {
+      const c = createCreature(egg.x, egg.y);
+      for (let i = 0; i < 15; i++) {
+        state.particles.push({
+          x: egg.x, y: egg.y,
+          vx: (Math.random()-0.5)*80, vy: -Math.random()*60-20,
+          life: 1.2, color: c.color, size: 2+Math.random()*3,
+        });
+      }
+      return false;
+    }
+    return true;
+  });
+}
+
+// ===== UI RENDERING =====
+function renderCreaturePanel() {
+  const panel = document.getElementById('creaturePanel');
+  const c = state.selected;
+  if (!c) { panel.classList.remove('active'); return; }
+  panel.classList.add('active');
+
+  document.getElementById('cName').textContent = c.name;
+  document.getElementById('cSpecies').textContent = `${c.species.name} · Level ${c.level}`;
+
+  const statsEl = document.getElementById('cStats');
+  const colors = { intelligence: '#8be9fd', creativity: '#ff79c6', strength: '#ff5555', speed: '#50fa7b', luck: '#f1fa8c' };
+  statsEl.innerHTML = Object.entries(c.stats).map(([key, val]) => `
+    <div class="stat-row">
+      <div class="stat-label">${key.slice(0,3).toUpperCase()}</div>
+      <div class="stat-bar"><div class="stat-fill" style="width:${val}%;background:${colors[key]}"></div></div>
+      <div class="stat-val">${val}</div>
+    </div>
+  `).join('');
+
+  const needed = c.level * 50;
+  document.getElementById('cXp').textContent = `${c.xp}/${needed}`;
+  document.getElementById('cXpFill').style.width = `${(c.xp/needed)*100}%`;
+  document.getElementById('cActivity').textContent = c.activity;
+}
+
+function renderEventLog() {
+  const list = document.getElementById('eventList');
+  list.innerHTML = state.events.slice(0, 15).map(e => {
+    const cls = e.type === 'good' ? 'ev-good' : e.type === 'bad' ? 'ev-bad' : 'ev-neutral';
+    const time = new Date(e.time).toLocaleTimeString('en-US', {hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<li><span class="ev-time">${time}</span><span class="${cls}">${e.text}</span></li>`;
+  }).join('');
+}
+
+function renderZones() {
+  const list = document.getElementById('zoneList');
+  list.innerHTML = BIOMES.map(b => {
+    const pop = state.creatures.filter(c => {
+      const tx = Math.floor(c.x / TILE);
+      const ty = Math.floor(c.y / TILE);
+      return tx >= b.x && tx < b.x+b.w && ty >= b.y && ty < b.y+b.h;
+    }).length;
+    return `<li><span class="zone-name" style="color:${b.accent}">${b.name}</span><span class="zone-pop">${pop}</span></li>`;
+  }).join('');
+}
+
+function renderMinimap() {
+  const mc = document.getElementById('minimapCanvas');
+  mc.width = 120; mc.height = 120;
+  const mctx = mc.getContext('2d');
+  const scale = 120 / WORLD_W;
+
+  // Draw biomes
+  for (const b of BIOMES) {
+    mctx.fillStyle = b.ground;
+    mctx.fillRect(b.x*scale, b.y*scale, b.w*scale, b.h*scale);
+    mctx.strokeStyle = b.accent + '40';
+    mctx.strokeRect(b.x*scale, b.y*scale, b.w*scale, b.h*scale);
+  }
+
+  // Creatures as dots
+  for (const c of state.creatures) {
+    mctx.fillStyle = c.color;
+    mctx.fillRect((c.x/TILE)*scale, (c.y/TILE)*scale, 2, 2);
+  }
+
+  // Tasks
+  for (const t of state.tasks) {
+    mctx.fillStyle = '#fff';
+    mctx.fillRect((t.x/TILE)*scale, (t.y/TILE)*scale, 1, 1);
+  }
+
+  // Camera viewport
+  const cam = state.camera;
+  mctx.strokeStyle = '#f8f8f2';
+  mctx.lineWidth = 1;
+  mctx.strokeRect(
+    (cam.x/PIXEL_W)*120, (cam.y/PIXEL_H)*120,
+    (canvas.width/PIXEL_W)*120, (canvas.height/PIXEL_H)*120
+  );
+}
+
+// ===== INPUT =====
+canvas.addEventListener('mousedown', e => {
+  state.dragging = true;
+  state.dragStart = { x: e.clientX, y: e.clientY };
+  state.camStart = { ...state.camera };
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (state.dragging) {
+    state.camera.x = state.camStart.x - (e.clientX - state.dragStart.x);
+    state.camera.y = state.camStart.y - (e.clientY - state.dragStart.y);
+    state.camera.x = Math.max(0, Math.min(PIXEL_W - canvas.width, state.camera.x));
+    state.camera.y = Math.max(0, Math.min(PIXEL_H - canvas.height, state.camera.y));
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  const dx = Math.abs(e.clientX - state.dragStart.x);
+  const dy = Math.abs(e.clientY - state.dragStart.y);
+  if (dx < 5 && dy < 5) {
+    // Click — check for creature selection
+    const wx = e.clientX + state.camera.x;
+    const wy = e.clientY + state.camera.y;
+    let found = null;
+    for (const c of state.creatures) {
+      const d = Math.sqrt((c.x-wx)**2 + (c.y-wy)**2);
+      if (d < 15) { found = c; break; }
+    }
+    state.selected = found;
+    renderCreaturePanel();
+  }
+  state.dragging = false;
+});
+
+document.getElementById('hatchBtn').addEventListener('click', () => {
+  const cx = state.camera.x + canvas.width/2 + (Math.random()-0.5)*100;
+  const cy = state.camera.y + canvas.height/2 + (Math.random()-0.5)*100;
+  state.eggs.push({ x: cx, y: cy, timer: 3, duration: 3 });
+  addEvent('An egg appeared!', 'neutral');
+});
+
+// ===== MAIN LOOP =====
+let lastTime = performance.now();
+
+function gameLoop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime = now;
+
+  // Spawn tasks periodically
+  if (state.tasks.length < 15 + state.creatures.length * 2) {
+    if (Math.random() < 0.02) spawnTask();
+  }
+
+  // Update creatures
+  state.creatures.forEach(c => updateCreature(c, dt));
+
+  // Cycle counter
+  state.cycle = Math.floor((Date.now() - startTime) / 30000);
+
+  // Draw
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawWorld();
+  drawTasks();
+  drawEggs();
+  state.creatures.forEach(c => drawCreature(c));
+  drawParticles(dt);
+
+  // Update UI
+  document.getElementById('creatureCount').textContent = state.creatures.length;
+  document.getElementById('taskCount').textContent = state.tasks.length;
+  document.getElementById('cycleCount').textContent = state.cycle;
+
+  if (state.selected) renderCreaturePanel();
+  if (now % 60 < 16) { renderZones(); renderMinimap(); }
+
+  requestAnimationFrame(gameLoop);
+}
+
+const startTime = Date.now();
+generateWorld();
+
+// Spawn initial creatures
+for (let i = 0; i < 5; i++) {
+  const b = BIOMES[Math.floor(Math.random() * BIOMES.length)];
+  const x = (b.x + 3 + Math.random() * (b.w - 6)) * TILE;
+  const y = (b.y + 3 + Math.random() * (b.h - 6)) * TILE;
+  createCreature(x, y);
+}
+
+// Spawn initial tasks
+for (let i = 0; i < 20; i++) spawnTask();
+
+renderZones();
+renderEventLog();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
