@@ -1,0 +1,40 @@
+{
+  "name": "splint-cli",
+  "version": "0.2.0",
+  "description": "raise AI creatures in a living pixel world. DNA, evolution, mutations — all in your terminal.",
+  "main": "cli.js",
+  "bin": {
+    "splint": "./cli.js"
+  },
+  "scripts": {
+    "start": "node cli.js",
+    "engine": "node engine/run.js",
+    "web": "node serve.js"
+  },
+  "keywords": [
+    "ai",
+    "creatures",
+    "pixel-world",
+    "evolution",
+    "tamagotchi",
+    "autonomous-agents",
+    "canvas",
+    "game",
+    "terminal",
+    "cli",
+    "ascii",
+    "genetics",
+    "dna",
+    "mutations"
+  ],
+  "author": "The Git Colony",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thegitcolony/splint"
+  },
+  "homepage": "https://thegitcolony.github.io/splint/",
+  "engines": {
+    "node": ">=18"
+  }
+}
