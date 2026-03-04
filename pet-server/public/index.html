@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>splint — the neighborhood</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #1a1a1a;
+    background: #0d0d0d;
+    z-index: 10;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .logo span { color: #34d399; }
+
+  .stats {
+    font-size: 11px;
+    color: #666;
+    display: flex;
+    gap: 16px;
+  }
+
+  .stats .val { color: #34d399; }
+
+  #world-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+  }
+
+  #world {
+    width: 800px;
+    height: 500px;
+    background: #111;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(52, 211, 153, 0.05);
+    border: 1px solid #1a1a1a;
+  }
+
+  /* Grass texture */
+  #world::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 15% 25%, #0f1a0f 1px, transparent 1px),
+      radial-gradient(circle at 45% 65%, #0f1a0f 1px, transparent 1px),
+      radial-gradient(circle at 75% 35%, #0f1a0f 1px, transparent 1px),
+      radial-gradient(circle at 85% 85%, #0f1a0f 1px, transparent 1px);
+    background-size: 80px 80px;
+    opacity: 0.5;
+  }
+
+  /* Path */
+  .path {
+    position: absolute;
+    background: #1a1610;
+    border-radius: 4px;
+    opacity: 0.6;
+  }
+
+  .pet {
+    position: absolute;
+    transition: left 0.18s linear, top 0.18s linear;
+    cursor: pointer;
+    z-index: 5;
+    user-select: none;
+  }
+
+  .pet-sprite {
+    font-size: 28px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    transition: transform 0.15s;
+  }
+
+  .pet:hover .pet-sprite {
+    transform: scale(1.2);
+  }
+
+  .pet.facing-left .pet-sprite {
+    transform: scaleX(-1);
+  }
+  .pet.facing-left:hover .pet-sprite {
+    transform: scaleX(-1) scale(1.2);
+  }
+
+  .pet-name {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #888;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.7);
+    padding: 1px 6px;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .pet:hover .pet-name {
+    opacity: 1;
+  }
+
+  .bubble {
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    color: #111;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    animation: bubblePop 0.3s ease-out;
+    pointer-events: none;
+  }
+
+  .bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: rgba(255,255,255,0.95);
+  }
+
+  @keyframes bubblePop {
+    from { transform: translateX(-50%) scale(0); }
+    to { transform: translateX(-50%) scale(1); }
+  }
+
+  .world-object {
+    position: absolute;
+    font-size: 24px;
+    z-index: 2;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+    pointer-events: none;
+  }
+
+  /* Pet info card */
+  .pet-card {
+    display: none;
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(13, 13, 13, 0.95);
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 16px 20px;
+    z-index: 20;
+    min-width: 260px;
+    backdrop-filter: blur(10px);
+  }
+
+  .pet-card.active { display: block; }
+
+  .pet-card h3 {
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: #34d399;
+  }
+
+  .pet-card .owner {
+    font-size: 10px;
+    color: #555;
+    margin-bottom: 10px;
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    font-size: 10px;
+  }
+
+  .stat-label { width: 65px; color: #777; }
+  .stat-bar {
+    flex: 1;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .stat-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s;
+  }
+
+  .empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    gap: 8px;
+    z-index: 3;
+  }
+
+  .empty-state .big { font-size: 40px; }
+  .empty-state p { font-size: 12px; }
+  .empty-state code {
+    background: #1a1a1a;
+    padding: 4px 12px;
+    border-radius: 6px;
+    color: #34d399;
+    font-size: 11px;
+  }
+
+  footer {
+    padding: 8px 24px;
+    text-align: center;
+    font-size: 10px;
+    color: #333;
+    border-top: 1px solid #1a1a1a;
+  }
+
+  footer a { color: #34d399; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>splint</span> — the neighborhood</div>
+  <div class="stats">
+    <div>pets: <span class="val" id="pet-count">0</span></div>
+    <div>online: <span class="val" id="online-count">0</span></div>
+  </div>
+</header>
+
+<div id="world-container">
+  <div id="world">
+    <!-- Paths -->
+    <div class="path" style="left:80px;top:240px;width:640px;height:20px;"></div>
+    <div class="path" style="left:390px;top:80px;width:20px;height:340px;"></div>
+    <div class="path" style="left:180px;top:160px;width:20px;height:180px;"></div>
+    <div class="path" style="left:600px;top:160px;width:20px;height:180px;"></div>
+
+    <div id="objects"></div>
+    <div id="pets"></div>
+
+    <div class="empty-state" id="empty-state">
+      <div class="big">🥚</div>
+      <p>no pets yet. hatch one from the CLI:</p>
+      <code>python pet.py</code>
+    </div>
+  </div>
+
+  <div class="pet-card" id="pet-card">
+    <h3 id="card-name"></h3>
+    <div class="owner" id="card-owner"></div>
+    <div class="stat-row">
+      <span class="stat-label">hunger</span>
+      <div class="stat-bar"><div class="stat-fill" id="bar-hunger" style="background:#f59e0b;width:50%"></div></div>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">happiness</span>
+      <div class="stat-bar"><div class="stat-fill" id="bar-happiness" style="background:#ec4899;width:50%"></div></div>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">energy</span>
+      <div class="stat-bar"><div class="stat-fill" id="bar-energy" style="background:#3b82f6;width:50%"></div></div>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">health</span>
+      <div class="stat-bar"><div class="stat-fill" id="bar-health" style="background:#22c55e;width:50%"></div></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  splint — living pixel world · <a href="https://github.com/splint-cli/splint">github</a>
+</footer>
+
+<script>
+const SPECIES_EMOJI = {
+  cat: '🐱', dog: '🐶', bunny: '🐰', hamster: '🐹',
+  bird: '🐦', fox: '🦊', turtle: '🐢', penguin: '🐧',
+};
+
+const world = document.getElementById('world');
+const petsContainer = document.getElementById('pets');
+const objectsContainer = document.getElementById('objects');
+const emptyState = document.getElementById('empty-state');
+const petCard = document.getElementById('pet-card');
+const petCountEl = document.getElementById('pet-count');
+const onlineCountEl = document.getElementById('online-count');
+
+let petElements = {};
+let selectedPet = null;
+
+// WebSocket with HTTP polling fallback
+const wsUrl = `ws://${location.host}`;
+let ws;
+let wsConnected = false;
+let pollInterval = null;
+
+function connect() {
+  try {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      wsConnected = true;
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    };
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'init' || data.type === 'tick') {
+        renderPets(data.pets || []);
+        if (data.objects && !objectsContainer.hasChildNodes()) {
+          renderObjects(data.objects);
+        }
+      }
+    };
+
+    ws.onclose = () => { wsConnected = false; startPolling(); setTimeout(connect, 3000); };
+    ws.onerror = () => { ws.close(); };
+  } catch(e) {
+    startPolling();
+  }
+}
+
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(async () => {
+    try {
+      const resp = await fetch('/api/state');
+      const data = await resp.json();
+      renderPets(data.pets || []);
+      if (data.objects && !objectsContainer.hasChildNodes()) renderObjects(data.objects);
+    } catch(e) {}
+  }, 300);
+}
+
+function renderObjects(objects) {
+  objectsContainer.innerHTML = '';
+  for (const obj of objects) {
+    const el = document.createElement('div');
+    el.className = 'world-object';
+    el.textContent = obj.sprite;
+    el.style.left = obj.x + 'px';
+    el.style.top = obj.y + 'px';
+    objectsContainer.appendChild(el);
+  }
+}
+
+function renderPets(pets) {
+  emptyState.style.display = pets.length === 0 ? 'flex' : 'none';
+  petCountEl.textContent = pets.length;
+
+  // Count "online" (seen in last 5 min)
+  const now = Date.now();
+  const online = pets.filter(p => now - p.lastSeen < 300000).length;
+  onlineCountEl.textContent = online;
+
+  const seen = new Set();
+
+  for (const pet of pets) {
+    seen.add(pet.id);
+    let el = petElements[pet.id];
+
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'pet';
+      el.innerHTML = `
+        <div class="pet-name"><span class="pn"></span> <span style="opacity:0.5">lv${pet.level || 1}</span></div>
+        <div class="pet-sprite"></div>
+      `;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showCard(pet);
+      });
+      petsContainer.appendChild(el);
+      petElements[pet.id] = el;
+    }
+
+    el.style.left = (pet.nx - 14) + 'px';
+    el.style.top = (pet.ny - 14) + 'px';
+    el.className = 'pet' + (pet.facing === 'left' ? ' facing-left' : '');
+    el.querySelector('.pet-sprite').textContent = SPECIES_EMOJI[pet.species] || '🐾';
+    el.querySelector('.pn').textContent = pet.name;
+
+    // Bubble
+    let bubbleEl = el.querySelector('.bubble');
+    if (pet.bubble) {
+      if (!bubbleEl) {
+        bubbleEl = document.createElement('div');
+        bubbleEl.className = 'bubble';
+        el.appendChild(bubbleEl);
+      }
+      bubbleEl.textContent = pet.bubble;
+    } else if (bubbleEl) {
+      bubbleEl.remove();
+    }
+
+    // Update card if selected
+    if (selectedPet === pet.id) {
+      updateCard(pet);
+    }
+  }
+
+  // Remove gone pets
+  for (const id of Object.keys(petElements)) {
+    if (!seen.has(id)) {
+      petElements[id].remove();
+      delete petElements[id];
+    }
+  }
+}
+
+function showCard(pet) {
+  selectedPet = pet.id;
+  petCard.classList.add('active');
+  updateCard(pet);
+}
+
+function updateCard(pet) {
+  document.getElementById('card-name').textContent = `${SPECIES_EMOJI[pet.species] || '🐾'} ${pet.name}`;
+  document.getElementById('card-owner').textContent = `owner: ${pet.owner} · level ${pet.level || 1}`;
+  document.getElementById('bar-hunger').style.width = pet.hunger + '%';
+  document.getElementById('bar-happiness').style.width = pet.happiness + '%';
+  document.getElementById('bar-energy').style.width = pet.energy + '%';
+  document.getElementById('bar-health').style.width = pet.health + '%';
+}
+
+world.addEventListener('click', () => {
+  petCard.classList.remove('active');
+  selectedPet = null;
+});
+
+connect();
+</script>
+</body>
+</html>
