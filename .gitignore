@@ -1,0 +1,6 @@
+node_modules/
+*.save.json
+.splint-save.json
+pet_save.json
+pets.json
+world-state.json
