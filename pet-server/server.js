@@ -212,7 +212,7 @@ const server = http.createServer(async (req, res) => {
       const data = JSON.parse(await readBody(req));
       if (!data.id || !pets[data.id]) { json(res, 404, { error: 'pet not found' }); return; }
       const pet = pets[data.id];
-      for (const k of ['hunger', 'happiness', 'energy', 'health', 'level', 'name']) {
+      for (const k of ['hunger', 'happiness', 'energy', 'health', 'level', 'name', 'owner']) {
         if (data[k] !== undefined) pet[k] = k === 'name' ? data[k] : Math.min(100, Math.max(0, data[k]));
       }
       pet.lastSeen = Date.now();
