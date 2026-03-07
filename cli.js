@@ -570,7 +570,7 @@ function passiveUpdate() {
 function render() {
   frame++;
   if (messageTimer > 0) messageTimer--;
-  let buf = HOME;
+  let buf = CLEAR + HOME;
 
   if (mode === 'boot') buf += renderBoot();
   else if (mode === 'hatching') buf += renderHatching();
@@ -587,7 +587,7 @@ function render() {
 
 function renderBoot() {
   const saved = loadSave();
-  if (saved) { pet = saved; if (!pet.buffs) pet.buffs = []; if (!pet.inventory) pet.inventory = []; mode = 'living'; return ''; }
+  if (saved) { pet = saved; if (!pet.buffs) pet.buffs = []; if (!pet.inventory) pet.inventory = []; mode = 'living'; return CLEAR + HOME; }
   let buf = '\n\n\n\n';
   buf += center(`${GREEN}${BOLD}S P L I N T${RESET}`, W) + '\n';
   buf += center(`${GRAY}raise a creature. watch it evolve.${RESET}`, W) + '\n\n\n';
