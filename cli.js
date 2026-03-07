@@ -191,7 +191,7 @@ const SAVE_PATH = path.join(SAVE_DIR, 'save.json');
 
 // ===== SERVER SYNC =====
 const SYNC_CONFIG_PATH = path.join(SAVE_DIR, 'sync.json');
-const DEFAULT_SERVER = 'http://localhost:3456';
+const DEFAULT_SERVER = 'https://splintcli.onrender.com';
 
 function getSyncUrl() {
   try {
