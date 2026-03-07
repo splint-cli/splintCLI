@@ -1,0 +1,16 @@
+{
+  "2e8e2628-ec9d-431a-9c14-89df88dff120": {
+    "id": "2e8e2628-ec9d-431a-9c14-89df88dff120",
+    "name": "wolfie",
+    "species": "wolf",
+    "owner": "ANON",
+    "hunger": 80,
+    "happiness": 80,
+    "energy": 80,
+    "health": 100,
+    "level": 1,
+    "xp": 0,
+    "born": 1772858668278,
+    "lastSeen": 1772858668278
+  }
+}
