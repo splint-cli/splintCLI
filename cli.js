@@ -4,6 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 const { generateGenome, getSpeciesInfo, checkMutations } = require('./engine/dna');
+const http = require('http');
+const https = require('https');
 
 // ===== ANSI =====
 const ESC = '\x1b[';
@@ -187,10 +189,64 @@ const SAVE_DIR = path.join(process.env.USERPROFILE || process.env.HOME || __dirn
 if (!fs.existsSync(SAVE_DIR)) fs.mkdirSync(SAVE_DIR, { recursive: true });
 const SAVE_PATH = path.join(SAVE_DIR, 'save.json');
 
+// ===== SERVER SYNC =====
+const SYNC_CONFIG_PATH = path.join(SAVE_DIR, 'sync.json');
+const DEFAULT_SERVER = 'http://localhost:3456';
+
+function getSyncUrl() {
+  try {
+    if (fs.existsSync(SYNC_CONFIG_PATH)) {
+      const cfg = JSON.parse(fs.readFileSync(SYNC_CONFIG_PATH, 'utf8'));
+      return cfg.server || DEFAULT_SERVER;
+    }
+  } catch {}
+  return DEFAULT_SERVER;
+}
+
+function syncToServer(p) {
+  if (!p || !p.name) return;
+  const serverUrl = getSyncUrl();
+  try {
+    const url = new URL(serverUrl + '/api/register');
+    const mod = url.protocol === 'https:' ? https : http;
+    const data = JSON.stringify({
+      id: p.id || (p.animal + '-' + p.name),
+      name: p.name,
+      species: p.animal,
+      owner: process.env.USER || process.env.USERNAME || 'anon',
+      level: p.level || 1,
+      hunger: Math.floor(p.hunger || 0),
+      happiness: Math.floor(p.happiness || 0),
+      energy: Math.floor(p.energy || 0),
+      health: Math.floor(p.hp || p.health || 100),
+    });
+    const req = mod.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      timeout: 3000,
+    }, () => {});
+    req.on('error', () => {});
+    req.write(data);
+    req.end();
+  } catch {}
+}
+
+let lastSyncTime = 0;
+function throttledSync(p) {
+  const now = Date.now();
+  if (now - lastSyncTime < 5000) return;
+  lastSyncTime = now;
+  syncToServer(p);
+}
+
+
 function loadSave() {
   try { if (fs.existsSync(SAVE_PATH)) return JSON.parse(fs.readFileSync(SAVE_PATH, 'utf8')); } catch {} return null;
 }
-function savePet(p) { fs.writeFileSync(SAVE_PATH, JSON.stringify(p, null, 2)); }
+function savePet(p) { fs.writeFileSync(SAVE_PATH, JSON.stringify(p, null, 2)); throttledSync(p); }
 
 // ===== STATE =====
 let pet = null;
@@ -258,7 +314,9 @@ process.stdin.on('data', (key) => {
     else if (key === '\r' || key === '\n') {
       if (inputBuffer.trim().length > 0) {
         pet.name = inputBuffer.trim();
+        pet.id = pet.id || require('crypto').randomUUID();
         savePet(pet);
+        syncToServer(pet);
         mode = 'living';
         process.stdout.write(CLEAR);
         setMsg(`${pet.name} looks up at you!`);
@@ -619,7 +677,7 @@ function renderHatching() {
   } else {
     if (!selectedAnimal) {
       selectedAnimal = ANIMAL_KEYS[Math.floor(Math.random() * ANIMAL_KEYS.length)];
-      pet = { animal: selectedAnimal, name: '', genome: generateGenome(), level: 1, xp: 0, hp: 100, maxHp: 100, hunger: 80, energy: 100, happiness: 80, stage: 'baby', age: 0, bornAt: Date.now(), inventory: [], buffs: [], sick: false, evolved: false };
+      pet = { animal: selectedAnimal, name: '', genome: generateGenome(), level: 1, xp: 0, hp: 100, maxHp: 100, hunger: 80, energy: 100, happiness: 80, stage: 'baby', age: 0, bornAt: Date.now(), inventory: [], buffs: [], sick: false, evolved: false, id: require('crypto').randomUUID() };
     }
     const art = ANIMALS[selectedAnimal].baby;
     const color = hexFg(getSpeciesInfo(pet.genome.species).base);
@@ -790,5 +848,5 @@ function renderEvolving() {
 
 // ===== MAIN =====
 const saved = loadSave();
-if (saved) { pet = saved; if (!pet.buffs) pet.buffs = []; if (!pet.inventory) pet.inventory = []; mode = 'living'; setMsg(`welcome back! ${pet.name} missed you.`); }
+if (saved) { pet = saved; if (!pet.buffs) pet.buffs = []; if (!pet.inventory) pet.inventory = []; mode = 'living'; setMsg(`welcome back! ${pet.name} missed you.`); syncToServer(pet); }
 setInterval(render, 100);
