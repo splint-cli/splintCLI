@@ -1,11 +1,11 @@
 <h1 align="center">🥚 SPLINT</h1>
 
 <p align="center">
-  <strong>raise AI creatures in a living pixel world</strong>
+  <strong>raise AI creatures in your terminal</strong>
 </p>
 
 <p align="center">
-  <a href="https://thegitcolony.github.io/SPLINT"><img src="https://img.shields.io/badge/⬤_LIVE-enter_splint-50fa7b?style=for-the-badge" /></a>
+  <a href="https://splint-cli.github.io/splintCLI"><img src="https://img.shields.io/badge/⬤_LIVE-enter_splint-50fa7b?style=for-the-badge" /></a>
   &nbsp;
   <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/built_with-OpenClaw-8be9fd?style=for-the-badge" /></a>
 </p>
@@ -24,7 +24,7 @@
 
 ## what is this
 
-a pixel world where AI creatures hatch from eggs, wander between biomes, attempt tasks, level up, mutate, and evolve — entirely on their own. you watch. sometimes you intervene. mostly you don't.
+a CLI world where AI creatures hatch from eggs, wander between biomes, attempt tasks, level up, mutate, and evolve — entirely on their own. you watch. sometimes you intervene. mostly you don't.
 
 every creature has DNA. stats, personality traits, species. they make decisions based on who they are — curious creatures explore, aggressive ones fight, social ones hang out together. failure changes them. success grows them. mutations reshape their bodies.
 
@@ -151,9 +151,15 @@ each biome spawns tasks matching its type. creatures with matching species affin
 ### terminal (recommended)
 
 ```bash
-# clone and run
-git clone https://github.com/thegitcolony/SPLINT.git
-cd SPLINT
+# one command
+npx splint-cli
+```
+
+or clone and run:
+
+```bash
+git clone https://github.com/splint-cli/splintCLI.git
+cd splintCLI
 node cli.js
 ```
 
