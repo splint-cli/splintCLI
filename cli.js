@@ -191,6 +191,7 @@ const SAVE_PATH = path.join(SAVE_DIR, 'save.json');
 
 // ===== SERVER SYNC =====
 const SYNC_CONFIG_PATH = path.join(SAVE_DIR, 'sync.json');
+const OWNER_PATH = path.join(SAVE_DIR, 'owner.txt');
 const DEFAULT_SERVER = 'https://splintcli.onrender.com';
 
 function getSyncUrl() {
@@ -203,6 +204,11 @@ function getSyncUrl() {
   return DEFAULT_SERVER;
 }
 
+function getOwner() {
+  try { if (fs.existsSync(OWNER_PATH)) return fs.readFileSync(OWNER_PATH, 'utf8').trim(); } catch {}
+  return 'anon';
+}
+
 function syncToServer(p) {
   if (!p || !p.name) return;
   const serverUrl = getSyncUrl();
@@ -213,7 +219,7 @@ function syncToServer(p) {
       id: p.id || (p.animal + '-' + p.name),
       name: p.name,
       species: p.animal,
-      owner: process.env.USER || process.env.USERNAME || 'anon',
+      owner: p.owner || getOwner(),
       level: p.level || 1,
       hunger: Math.floor(p.hunger || 0),
       happiness: Math.floor(p.happiness || 0),
@@ -309,15 +315,29 @@ process.stdin.on('data', (key) => {
   }
   if (mode === 'hatching') return;
 
+  if (mode === 'owner') {
+    if (key === '\x7f' || key === '\b') { inputBuffer = inputBuffer.slice(0, -1); }
+    else if (key === '\r' || key === '\n') {
+      const ownerName = inputBuffer.trim() || 'anon';
+      pet.owner = ownerName;
+      fs.writeFileSync(OWNER_PATH, ownerName);
+      savePet(pet);
+      syncToServer(pet);
+      mode = 'living';
+      process.stdout.write(CLEAR);
+      setMsg(pet.name + ' looks up at you!');
+    } else if (key.length === 1 && inputBuffer.length < 15) { inputBuffer += key; }
+    return;
+  }
+
   if (mode === 'naming') {
     if (key === '\x7f' || key === '\b') { inputBuffer = inputBuffer.slice(0, -1); }
     else if (key === '\r' || key === '\n') {
       if (inputBuffer.trim().length > 0) {
         pet.name = inputBuffer.trim();
         pet.id = pet.id || require('crypto').randomUUID();
-        savePet(pet);
-        syncToServer(pet);
-        mode = 'living';
+        inputBuffer = '';
+        mode = 'owner';
         process.stdout.write(CLEAR);
         setMsg(`${pet.name} looks up at you!`);
       }
@@ -633,6 +653,7 @@ function render() {
   if (mode === 'boot') buf += renderBoot();
   else if (mode === 'hatching') buf += renderHatching();
   else if (mode === 'naming') buf += renderNaming();
+  else if (mode === 'owner') buf += renderOwner();
   else if (mode === 'living') buf += renderLiving();
   else if (mode === 'expedition') buf += renderExpedition();
   else if (mode === 'battle') buf += renderBattle();
@@ -697,6 +718,19 @@ function renderNaming() {
   buf += '\n' + center(`${CYAN}what will you name your ${animal.name}?${RESET}`, W) + '\n\n';
   buf += center(`${WHITE}${BOLD}> ${inputBuffer}█${RESET}`, W) + '\n\n';
   buf += center(`${GRAY}type a name and press enter${RESET}`, W) + '\n';
+  return buf;
+}
+
+function renderOwner() {
+  const animal = ANIMALS[pet.animal];
+  const color = hexFg(getSpeciesInfo(pet.genome.species).base);
+  let buf = '\n\n\n';
+  buf += center(GREEN + BOLD + 'S P L I N T' + RESET, W) + '\n\n';
+  for (const l of animal.baby) buf += center(color + BOLD + l + RESET, W) + '\n';
+  buf += '\n' + center(CYAN + 'what should other players see as your name?' + RESET, W) + '\n';
+  buf += center(GRAY + '(this shows in the neighborhood playground)' + RESET, W) + '\n\n';
+  buf += center(WHITE + BOLD + '> ' + inputBuffer + '█' + RESET, W) + '\n\n';
+  buf += center(GRAY + 'type a name and press enter (or enter for anon)' + RESET, W) + '\n';
   return buf;
 }
 
