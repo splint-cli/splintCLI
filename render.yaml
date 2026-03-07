@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: splint-neighborhood
+    runtime: node
+    rootDir: pet-server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3456
+    plan: free
