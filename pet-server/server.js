@@ -20,6 +20,83 @@ function save() {
   fs.writeFileSync(SAVE_FILE, JSON.stringify(pets, null, 2));
 }
 
+
+// ===== GITHUB PERSISTENCE =====
+const GH_PAT = process.env.GH_PAT || '';
+const GH_REPO = 'splint-cli/splintCLI';
+const GH_FILE = 'pets-data.json';
+let ghSha = null;
+let lastSavedHash = '';
+
+function ghApi(method, ghPath, body) {
+  return new Promise((resolve, reject) => {
+    if (!GH_PAT) { resolve(null); return; }
+    const data = body ? JSON.stringify(body) : null;
+    const req = require('https').request({
+      hostname: 'api.github.com', path: '/repos/' + GH_REPO + ghPath, method,
+      headers: { 'Authorization': 'token ' + GH_PAT, 'User-Agent': 'splint-server', 'Accept': 'application/vnd.github.v3+json',
+        ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) },
+    }, (res) => { let buf = ''; res.on('data', c => buf += c); res.on('end', () => { try { resolve(JSON.parse(buf)); } catch { resolve(null); } }); });
+    req.on('error', () => resolve(null));
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+async function loadFromGitHub() {
+  if (!GH_PAT) { console.log('No GH_PAT — GitHub persistence disabled'); return; }
+  try {
+    const f = await ghApi('GET', '/contents/' + GH_FILE + '?ref=main');
+    if (f && f.content) {
+      const data = JSON.parse(Buffer.from(f.content, 'base64').toString('utf8'));
+      ghSha = f.sha;
+      if (data && typeof data === 'object') {
+        // data is { id: petObj, ... }
+        for (const [id, pet] of Object.entries(data)) {
+          pets[id] = pet;
+          initPetPosition(pets[id]);
+        }
+        console.log('Loaded ' + Object.keys(data).length + ' pets from GitHub');
+        lastSavedHash = JSON.stringify(pets);
+      }
+    }
+  } catch(e) { console.log('GitHub load failed:', e.message); }
+}
+
+async function saveToGitHub() {
+  if (!GH_PAT) return;
+  const currentHash = JSON.stringify(pets);
+  if (currentHash === lastSavedHash) return; // no changes
+  try {
+    // Strip position/animation state, only save core data
+    const saveData = {};
+    for (const [id, pet] of Object.entries(pets)) {
+      saveData[id] = {
+        id: pet.id, name: pet.name, species: pet.species, owner: pet.owner,
+        hunger: pet.hunger, happiness: pet.happiness, energy: pet.energy, health: pet.health,
+        level: pet.level, xp: pet.xp, born: pet.born, lastSeen: pet.lastSeen,
+      };
+    }
+    const body = {
+      message: 'sync: update pets data',
+      content: Buffer.from(JSON.stringify(saveData, null, 2)).toString('base64'),
+      branch: 'main',
+    };
+    if (ghSha) body.sha = ghSha;
+    const r = await ghApi('PUT', '/contents/' + GH_FILE, body);
+    if (r && r.content) {
+      ghSha = r.content.sha;
+      lastSavedHash = currentHash;
+      console.log('Saved ' + Object.keys(saveData).length + ' pets to GitHub');
+    }
+  } catch(e) { console.log('GitHub save failed:', e.message); }
+}
+
+// Save to GitHub every 60 seconds
+setInterval(saveToGitHub, 60000);
+// Also save on graceful shutdown
+process.on('SIGTERM', async () => { await saveToGitHub(); process.exit(0); });
+
 // ── Species data ──
 const SPECIES = {
   cat:      { emoji: '🐱', color: '#f59e0b', speed: 1.2, social: 0.4 },
@@ -280,7 +357,10 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+// Load pets from GitHub before starting
+loadFromGitHub().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
   console.log(`🐾 Splint Pet Neighborhood running on http://localhost:${PORT}`);
   console.log(`   ${Object.keys(pets).length} pets loaded`);
+  });
 });
