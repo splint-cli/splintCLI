@@ -22,14 +22,20 @@ function save() {
 
 // ── Species data ──
 const SPECIES = {
-  cat:     { emoji: '🐱', color: '#f59e0b', speed: 1.2, social: 0.4 },
-  dog:     { emoji: '🐶', color: '#3b82f6', speed: 1.5, social: 0.9 },
-  bunny:   { emoji: '🐰', color: '#ec4899', speed: 1.8, social: 0.5 },
-  hamster: { emoji: '🐹', color: '#f97316', speed: 0.8, social: 0.3 },
-  bird:    { emoji: '🐦', color: '#06b6d4', speed: 2.0, social: 0.6 },
-  fox:     { emoji: '🦊', color: '#ef4444', speed: 1.6, social: 0.4 },
-  turtle:  { emoji: '🐢', color: '#22c55e', speed: 0.4, social: 0.2 },
-  penguin: { emoji: '🐧', color: '#8b5cf6', speed: 1.0, social: 0.7 },
+  cat:      { emoji: '🐱', color: '#f59e0b', speed: 1.2, social: 0.4 },
+  dog:      { emoji: '🐶', color: '#3b82f6', speed: 1.5, social: 0.9 },
+  bunny:    { emoji: '🐰', color: '#ec4899', speed: 1.8, social: 0.5 },
+  hamster:  { emoji: '🐹', color: '#f97316', speed: 0.8, social: 0.3 },
+  bird:     { emoji: '🐦', color: '#06b6d4', speed: 2.0, social: 0.6 },
+  fox:      { emoji: '🦊', color: '#ef4444', speed: 1.6, social: 0.4 },
+  turtle:   { emoji: '🐢', color: '#22c55e', speed: 0.4, social: 0.2 },
+  penguin:  { emoji: '🐧', color: '#8b5cf6', speed: 1.0, social: 0.7 },
+  wolf:     { emoji: '🐺', color: '#9ca3af', speed: 1.7, social: 0.5 },
+  dragon:   { emoji: '🐉', color: '#dc2626', speed: 1.4, social: 0.3 },
+  owl:      { emoji: '🦉', color: '#a78bfa', speed: 1.0, social: 0.4 },
+  snake:    { emoji: '🐍', color: '#65a30d', speed: 1.3, social: 0.2 },
+  rabbit:   { emoji: '🐇', color: '#f472b6', speed: 1.9, social: 0.6 },
+  mushroom: { emoji: '🍄', color: '#c084fc', speed: 0.3, social: 0.1 },
 };
 const SPECIES_LIST = Object.keys(SPECIES);
 
