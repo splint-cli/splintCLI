@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 // ── Config ──
-const PORT = 3456;
+const PORT = process.env.PORT || 3456;
 const SAVE_FILE = path.join(__dirname, 'pets.json');
 const TICK_MS = 200;
 const NEIGHBORHOOD_W = 800;
@@ -274,7 +274,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🐾 Splint Pet Neighborhood running on http://localhost:${PORT}`);
   console.log(`   ${Object.keys(pets).length} pets loaded`);
 });
