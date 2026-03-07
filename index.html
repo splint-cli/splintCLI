@@ -519,13 +519,13 @@ canvas.addEventListener('click', (e) => {
 });
 
 // ── Server URL resolution ──
-let serverUrl = '';
+let serverUrl = 'https://splintcli.onrender.com';
 let ws, wsOk = false, poll = null;
 
 async function resolveServer() {
   // If we're on the server itself (localhost/tunnel), use that
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    serverUrl = location.origin;
+    serverUrl = 'https://splintcli.onrender.com';
     connect();
     return;
   }
